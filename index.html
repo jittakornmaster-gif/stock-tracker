@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock Tracker — วัตถุดิบการผลิต</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #ffffff; --bg2: #f5f5f4; --bg3: #fafaf9;
+    --text: #1c1c1a; --text2: #6b6b68; --text3: #9b9b97;
+    --border: rgba(0,0,0,0.12); --border2: rgba(0,0,0,0.22);
+    --blue: #185FA5; --blue-bg: #E6F1FB; --blue-text: #0C447C;
+    --green: #0F6E56; --green-bg: #E1F5EE; --green-text: #085041;
+    --red: #A32D2D; --red-bg: #FCEBEB;
+    --amber: #854F0B; --amber-bg: #FAEEDA;
+    --radius: 8px; --radius-lg: 12px;
+    --font: 'Segoe UI', 'Noto Sans Thai', system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a; --bg2: #2a2a27; --bg3: #111110;
+      --text: #f0ede8; --text2: #a8a8a3; --text3: #6b6b68;
+      --border: rgba(255,255,255,0.12); --border2: rgba(255,255,255,0.22);
+      --blue-bg: #042C53; --blue-text: #B5D4F4;
+      --green-bg: #04342C; --green-text: #9FE1CB;
+      --red-bg: #501313; --amber-bg: #412402;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg3); color: var(--text); min-height: 100vh; font-size: 15px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+  .topbar { background: var(--bg); border-bottom: 0.5px solid var(--border); padding: 0 16px; position: sticky; top: 0; z-index: 100; }
+  .topbar-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 16px; height: 52px; flex-wrap: wrap; padding: 4px 0; }
+  .app-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 7px; color: var(--text); white-space: nowrap; }
+  .app-title i { color: var(--blue); font-size: 20px; }
+  .nav { display: flex; gap: 2px; flex-wrap: wrap; }
+  .nav-btn { background: transparent; border: none; border-radius: var(--radius); padding: 6px 13px; font-size: 13px; cursor: pointer; color: var(--text2); transition: all 0.15s; font-family: var(--font); display: flex; align-items: center; gap: 5px; }
+  .nav-btn.active { background: var(--bg2); color: var(--text); font-weight: 500; }
+  .nav-btn:hover:not(.active) { background: var(--bg2); }
+  .main { padding: 20px 0 40px; }
+  .section { display: none; }
+  .section.active { display: block; }
+  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 16px 18px; }
+  .metric-card { background: var(--bg2); border-radius: var(--radius); padding: 14px; }
+  .metric-label { font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+  .metric-value { font-size: 24px; font-weight: 600; color: var(--text); }
+  .metric-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .section-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+  .form-label { font-size: 12px; color: var(--text2); margin-bottom: 5px; display: block; }
+  .form-group { margin-bottom: 12px; }
+  input[type=text], input[type=number], input[type=date], select, textarea {
+    width: 100%; padding: 8px 10px; border: 0.5px solid var(--border2); border-radius: var(--radius);
+    background: var(--bg); color: var(--text); font-size: 13px; font-family: var(--font);
+    outline: none; transition: border 0.15s;
+  }
+  input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(24,95,165,0.12); }
+  .btn { border-radius: var(--radius); padding: 8px 18px; font-size: 13px; cursor: pointer; font-family: var(--font); font-weight: 500; border: none; display: inline-flex; align-items: center; gap: 6px; transition: opacity 0.15s; }
+  .btn:hover { opacity: 0.88; }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-green { background: var(--green); color: #fff; }
+  .btn-danger-outline { background: transparent; color: var(--red); border: 0.5px solid var(--red); }
+  .btn-secondary { background: transparent; color: var(--text2); border: 0.5px solid var(--border2); }
+  .btn-row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 500; }
+  .badge-green { background: var(--green-bg); color: var(--green-text); }
+  .badge-red { background: var(--red-bg); color: var(--red); }
+  .badge-amber { background: var(--amber-bg); color: var(--amber); }
+  .badge-blue { background: var(--blue-bg); color: var(--blue-text); }
+  .alert { border-radius: var(--radius); padding: 10px 14px; margin-bottom: 8px; display: flex; align-items: flex-start; gap: 9px; font-size: 13px; }
+  .alert-amber { background: var(--amber-bg); color: var(--amber); }
+  .alert-red { background: var(--red-bg); color: var(--red); }
+  .stock-bar-bg { background: var(--bg2); border-radius: 4px; height: 6px; overflow: hidden; margin-top: 5px; }
+  .stock-bar { height: 6px; border-radius: 4px; }
+  table { width: 100%; font-size: 13px; border-collapse: collapse; }
+  th { text-align: left; font-weight: 500; font-size: 12px; color: var(--text2); padding: 8px 10px; border-bottom: 0.5px solid var(--border); }
+  td { padding: 8px 10px; border-bottom: 0.5px solid var(--border); color: var(--text); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg2); }
+  .table-wrap { overflow-x: auto; }
+  .empty { text-align: center; padding: 2rem; color: var(--text3); font-size: 13px; }
+  .preview-box { background: var(--bg2); border-radius: var(--radius); padding: 8px 12px; font-size: 13px; color: var(--text2); margin-top: 4px; border: 0.5px solid var(--border); }
+  .msg { font-size: 12px; margin-top: 8px; min-height: 18px; }
+  .msg.ok { color: var(--green); }
+  .msg.err { color: var(--red); }
+  .storage-note { font-size: 11px; color: var(--text3); text-align: center; padding: 10px 0 0; }
+  @media (max-width: 600px) {
+    .topbar-inner { height: auto; padding: 8px 0; }
+    .nav-btn { padding: 5px 9px; font-size: 12px; }
+    .app-title { font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="app-title"><i class="ti ti-package"></i> Stock Tracker</div>
+    <nav class="nav">
+      <button class="nav-btn active" onclick="showTab('dashboard')"><i class="ti ti-layout-dashboard"></i> Dashboard</button>
+      <button class="nav-btn" onclick="showTab('parts')"><i class="ti ti-boxes"></i> วัตถุดิบ</button>
+      <button class="nav-btn" onclick="showTab('out')"><i class="ti ti-arrow-up-right"></i> จ่ายออก</button>
+      <button class="nav-btn" onclick="showTab('in')"><i class="ti ti-arrow-down-left"></i> รับเข้า</button>
+      <button class="nav-btn" onclick="showTab('history')"><i class="ti ti-history"></i> ประวัติ</button>
+    </nav>
+  </div>
+</div>
+
+<div class="main container">
+
+  <!-- DASHBOARD -->
+  <div id="tab-dashboard" class="section active">
+    <div id="alerts-box" style="margin-bottom:14px;"></div>
+    <div class="grid-4" id="summary-cards"></div>
+    <div class="grid-2" style="margin-bottom:14px;">
+      <div class="card">
+        <div class="section-title"><i class="ti ti-chart-line"></i> กราฟความเคลื่อนไหว Stock</div>
+        <div class="form-group">
+          <select id="chart-sel" onchange="updateChart()"><option value="">— เลือกวัตถุดิบ —</option></select>
+        </div>
+        <div style="position:relative;height:220px;"><canvas id="stockChart" role="img" aria-label="กราฟ Stock">กราฟ Stock</canvas></div>
+      </div>
+      <div class="card">
+        <div class="section-title"><i class="ti ti-table"></i> สถานะ Stock</div>
+        <div id="stock-status"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title"><i class="ti ti-clock"></i> รายการล่าสุด</div>
+      <div class="table-wrap" id="recent-all"></div>
+    </div>
+  </div>
+
+  <!-- PARTS -->
+  <div id="tab-parts" class="section">
+    <div class="grid-2">
+      <div class="card">
+        <div class="section-title"><i class="ti ti-plus"></i> เพิ่มวัตถุดิบใหม่</div>
+        <div class="form-group"><label class="form-label">ชื่อวัตถุดิบ *</label><input type="text" id="p-name" placeholder="เช่น เหล็กแผ่น, น้ำมันหล่อลื่น"></div>
+        <div class="form-group"><label class="form-label">รหัส / Part No.</label><input type="text" id="p-code" placeholder="เช่น RM-001"></div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">หน่วย *</label><input type="text" id="p-unit" placeholder="kg, pcs, L"></div>
+          <div class="form-group"><label class="form-label">Stock เริ่มต้น</label><input type="number" id="p-initial" placeholder="0" min="0"></div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Reorder Point (Min)</label><input type="number" id="p-min" placeholder="0" min="0"></div>
+          <div class="form-group"><label class="form-label">Stock เป้าหมาย</label><input type="number" id="p-target" placeholder="100" min="0"></div>
+        </div>
+        <div class="btn-row"><button class="btn btn-primary" onclick="addPart()"><i class="ti ti-plus"></i> เพิ่มวัตถุดิบ</button></div>
+        <div class="msg" id="p-msg"></div>
+      </div>
+      <div class="card">
+        <div class="section-title"><i class="ti ti-boxes"></i> รายการวัตถุดิบทั้งหมด</div>
+        <div id="parts-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OUT -->
+  <div id="tab-out" class="section">
+    <div class="grid-2">
+      <div class="card">
+        <div class="section-title"><i class="ti ti-arrow-up-right" style="color:var(--red);"></i> บันทึกการจ่ายวัตถุดิบ</div>
+        <div class="form-group"><label class="form-label">วันที่จ่าย *</label><input type="date" id="out-date"></div>
+        <div class="form-group"><label class="form-label">วัตถุดิบ *</label><select id="out-part" onchange="previewOut()"><option value="">— เลือก —</option></select></div>
+        <div class="form-group"><label class="form-label">จ่ายให้ (แผนก / ผู้รับ) *</label><input type="text" id="out-to" placeholder="เช่น ไลน์ผลิต A, คุณสมชาย"></div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">จำนวน *</label><input type="number" id="out-qty" placeholder="0" min="0" step="0.01" oninput="previewOut()"></div>
+          <div class="form-group"><label class="form-label">Stock หลังจ่าย</label><div class="preview-box" id="out-preview">—</div></div>
+        </div>
+        <div class="form-group"><label class="form-label">หมายเหตุ</label><input type="text" id="out-note" placeholder="ระบุเพิ่มเติม (ถ้ามี)"></div>
+        <div class="btn-row"><button class="btn btn-danger-outline" onclick="recordOut()"><i class="ti ti-arrow-up-right"></i> บันทึกการจ่าย</button></div>
+        <div class="msg" id="out-msg"></div>
+      </div>
+      <div class="card">
+        <div class="section-title"><i class="ti ti-history"></i> รายการจ่ายล่าสุด</div>
+        <div id="out-recent"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- IN -->
+  <div id="tab-in" class="section">
+    <div class="grid-2">
+      <div class="card">
+        <div class="section-title"><i class="ti ti-arrow-down-left" style="color:var(--green);"></i> บันทึกการรับวัตถุดิบ</div>
+        <div class="form-group"><label class="form-label">วันที่รับ *</label><input type="date" id="in-date"></div>
+        <div class="form-group"><label class="form-label">วัตถุดิบ *</label><select id="in-part" onchange="previewIn()"><option value="">— เลือก —</option></select></div>
+        <div class="form-group"><label class="form-label">รับจาก (Supplier) *</label><input type="text" id="in-from" placeholder="เช่น บริษัท ABC, คลังกลาง"></div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">จำนวนที่รับ *</label><input type="number" id="in-qty" placeholder="0" min="0" step="0.01" oninput="previewIn()"></div>
+          <div class="form-group"><label class="form-label">Stock หลังรับ</label><div class="preview-box" id="in-preview">—</div></div>
+        </div>
+        <div class="form-group"><label class="form-label">PO No.</label><input type="text" id="in-po" placeholder="เช่น PO-2025-001"></div>
+        <div class="form-group"><label class="form-label">หมายเหตุ</label><input type="text" id="in-note" placeholder="ระบุเพิ่มเติม (ถ้ามี)"></div>
+        <div class="btn-row"><button class="btn btn-green" onclick="recordIn()"><i class="ti ti-arrow-down-left"></i> บันทึกการรับ</button></div>
+        <div class="msg" id="in-msg"></div>
+      </div>
+      <div class="card">
+        <div class="section-title"><i class="ti ti-history"></i> รายการรับล่าสุด</div>
+        <div id="in-recent"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div id="tab-history" class="section">
+    <div class="card" style="margin-bottom:14px;">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+        <div style="flex:1;min-width:160px;"><label class="form-label">วัตถุดิบ</label><select id="f-part" onchange="renderHistory()"><option value="">ทั้งหมด</option></select></div>
+        <div style="flex:1;min-width:120px;"><label class="form-label">ประเภท</label><select id="f-type" onchange="renderHistory()"><option value="">ทั้งหมด</option><option value="in">รับเข้า</option><option value="out">จ่ายออก</option></select></div>
+        <div style="flex:1;min-width:130px;"><label class="form-label">จากวันที่</label><input type="date" id="f-from" onchange="renderHistory()"></div>
+        <div style="flex:1;min-width:130px;"><label class="form-label">ถึงวันที่</label><input type="date" id="f-to" onchange="renderHistory()"></div>
+        <button class="btn btn-primary" onclick="exportExcel()"><i class="ti ti-file-spreadsheet"></i> Export Excel</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title"><i class="ti ti-list"></i> ประวัติการเคลื่อนไหวทั้งหมด</div>
+      <div class="table-wrap" id="history-table"></div>
+    </div>
+  </div>
+
+  <div class="storage-note">ข้อมูลเก็บบนเครื่องนี้ (localStorage) — แต่ละเครื่องมีข้อมูลแยกกัน</div>
+</div>
+
+<script>
+const PARTS_KEY = 'st_parts_v1';
+const TX_KEY = 'st_tx_v1';
+let parts = [], transactions = [], stockChart = null;
+
+function load() {
+  try { parts = JSON.parse(localStorage.getItem(PARTS_KEY) || '[]'); } catch(e) { parts = []; }
+  try { transactions = JSON.parse(localStorage.getItem(TX_KEY) || '[]'); } catch(e) { transactions = []; }
+}
+function save() {
+  localStorage.setItem(PARTS_KEY, JSON.stringify(parts));
+  localStorage.setItem(TX_KEY, JSON.stringify(transactions));
+}
+function today() { return new Date().toISOString().split('T')[0]; }
+
+function getStock(partId) {
+  const p = parts.find(x => x.id === partId);
+  if (!p) return 0;
+  let s = parseFloat(p.initial) || 0;
+  transactions.filter(t => t.partId === partId).forEach(t => {
+    s += t.type === 'in' ? parseFloat(t.qty) : -parseFloat(t.qty);
+  });
+  return Math.round(s * 100) / 100;
+}
+
+function showTab(t) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + t).classList.add('active');
+  const map = { dashboard: 0, parts: 1, out: 2, in: 3, history: 4 };
+  document.querySelectorAll('.nav-btn')[map[t]].classList.add('active');
+  if (t === 'dashboard') renderDashboard();
+  if (t === 'parts') renderPartsList();
+  if (t === 'out') { fillSelects(); setDates(); renderRecentOut(); }
+  if (t === 'in') { fillSelects(); setDates(); renderRecentIn(); }
+  if (t === 'history') { fillFilterSelects(); renderHistory(); }
+}
+
+function setDates() {
+  ['out-date','in-date'].forEach(id => { if (!document.getElementById(id).value) document.getElementById(id).value = today(); });
+}
+
+function renderDashboard() {
+  renderAlerts(); renderSummaryCards(); renderStockStatus(); renderRecentAll(); fillChartSelect();
+}
+
+function renderAlerts() {
+  const c = document.getElementById('alerts-box');
+  let h = '';
+  parts.forEach(p => {
+    const s = getStock(p.id), min = parseFloat(p.min) || 0;
+    if (min > 0 && s <= 0) h += `<div class="alert alert-red"><i class="ti ti-alert-circle" style="flex-shrink:0;font-size:17px;"></i><div><strong>${p.name}</strong> — Stock หมดแล้ว! (${s} ${p.unit}) ต้องสั่งซื้อด่วน!</div></div>`;
+    else if (min > 0 && s <= min) h += `<div class="alert alert-amber"><i class="ti ti-alert-triangle" style="flex-shrink:0;font-size:17px;"></i><div><strong>${p.name}</strong> — Stock ต่ำกว่า Reorder Point (${s} ${p.unit} | Min: ${min}) ควรเริ่มสั่งซื้อ</div></div>`;
+  });
+  c.innerHTML = h;
+}
+
+function renderSummaryCards() {
+  const d7 = new Date(Date.now() - 7*86400000).toISOString().split('T')[0];
+  const low = parts.filter(p => { const s = getStock(p.id), m = parseFloat(p.min)||0; return m > 0 && s <= m; }).length;
+  const out7 = transactions.filter(t => t.type==='out' && t.date >= d7).reduce((a,t) => a+parseFloat(t.qty), 0);
+  const in7 = transactions.filter(t => t.type==='in' && t.date >= d7).reduce((a,t) => a+parseFloat(t.qty), 0);
+  document.getElementById('summary-cards').innerHTML = `
+    <div class="metric-card"><div class="metric-label">วัตถุดิบทั้งหมด</div><div class="metric-value">${parts.length}</div><div class="metric-sub">รายการ</div></div>
+    <div class="metric-card"><div class="metric-label" style="color:var(--amber);">Stock ต่ำ / หมด</div><div class="metric-value" style="color:var(--amber);">${low}</div><div class="metric-sub">รายการต้องสั่ง</div></div>
+    <div class="metric-card"><div class="metric-label">จ่ายออก 7 วัน</div><div class="metric-value">${out7.toLocaleString()}</div><div class="metric-sub">หน่วยรวม</div></div>
+    <div class="metric-card"><div class="metric-label">รับเข้า 7 วัน</div><div class="metric-value">${in7.toLocaleString()}</div><div class="metric-sub">หน่วยรวม</div></div>`;
+}
+
+function renderStockStatus() {
+  const c = document.getElementById('stock-status');
+  if (!parts.length) { c.innerHTML = '<div class="empty">ยังไม่มีวัตถุดิบ เพิ่มที่แท็บ "วัตถุดิบ"</div>'; return; }
+  let h = '';
+  parts.forEach(p => {
+    const s = getStock(p.id), min = parseFloat(p.min)||0, target = parseFloat(p.target)||Math.max(min*3,100);
+    const pct = target > 0 ? Math.min(100, Math.round(s/target*100)) : 100;
+    let bar = '#1D9E75', badge = 'badge-green', status = 'ปกติ';
+    if (min > 0 && s <= 0) { bar = '#E24B4A'; badge = 'badge-red'; status = 'หมด'; }
+    else if (min > 0 && s <= min) { bar = '#EF9F27'; badge = 'badge-amber'; status = 'ต่ำ'; }
+    h += `<div style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+        <span style="font-size:13px;font-weight:500;">${p.name}</span><span class="badge ${badge}">${status}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:4px;">
+        <span>${s.toLocaleString()} ${p.unit}</span><span>Min: ${min} | Target: ${target}</span>
+      </div>
+      <div class="stock-bar-bg"><div class="stock-bar" style="width:${pct}%;background:${bar};"></div></div>
+    </div>`;
+  });
+  c.innerHTML = h;
+}
+
+function renderRecentAll() {
+  const c = document.getElementById('recent-all');
+  const list = [...transactions].sort((a,b) => b.ts-a.ts).slice(0,10);
+  if (!list.length) { c.innerHTML = '<div class="empty">ยังไม่มีรายการ</div>'; return; }
+  let h = '<table><thead><tr><th style="width:95px;">วันที่</th><th>วัตถุดิบ</th><th style="width:75px;">ประเภท</th><th style="width:100px;">จำนวน</th><th>คู่ค้า</th></tr></thead><tbody>';
+  list.forEach(t => {
+    const p = parts.find(x=>x.id===t.partId);
+    const sign = t.type==='in' ? '+' : '-';
+    const col = t.type==='in' ? 'var(--green)' : 'var(--red)';
+    h += `<tr><td>${t.date}</td><td>${p?p.name:'—'}</td><td>${t.type==='in'?'<span class="badge badge-green">รับเข้า</span>':'<span class="badge badge-red">จ่ายออก</span>'}</td><td style="color:${col};font-weight:500;">${sign}${parseFloat(t.qty).toLocaleString()} ${p?p.unit:''}</td><td>${t.type==='in'?(t.from||'—'):(t.to||'—')}</td></tr>`;
+  });
+  c.innerHTML = h + '</tbody></table>';
+}
+
+function fillChartSelect() {
+  const s = document.getElementById('chart-sel');
+  const cur = s.value;
+  s.innerHTML = '<option value="">— เลือกวัตถุดิบ —</option>';
+  parts.forEach(p => s.innerHTML += `<option value="${p.id}">${p.name}</option>`);
+  if (cur) s.value = cur;
+  if (parts.length && !cur) { s.value = parts[0].id; updateChart(); }
+  else if (cur) updateChart();
+}
+
+function updateChart() {
+  const partId = document.getElementById('chart-sel').value;
+  if (!partId) return;
+  const p = parts.find(x => x.id === partId);
+  if (!p) return;
+  const txs = transactions.filter(t => t.partId === partId).sort((a,b) => a.date.localeCompare(b.date));
+  let s = parseFloat(p.initial)||0;
+  const labels = [], data = [];
+  if (txs.length) { labels.push(txs[0].date); data.push(s); }
+  txs.forEach(t => {
+    s = Math.round((s + (t.type==='in' ? parseFloat(t.qty) : -parseFloat(t.qty))) * 100) / 100;
+    labels.push(t.date); data.push(s);
+  });
+  if (!labels.length) return;
+  const min = parseFloat(p.min)||null;
+  const ctx = document.getElementById('stockChart').getContext('2d');
+  if (stockChart) stockChart.destroy();
+  const ds = [{ label: p.name + ' (' + p.unit + ')', data, borderColor: '#378ADD', backgroundColor: 'rgba(55,138,221,0.07)', tension: 0.3, pointRadius: 3, fill: true }];
+  if (min) ds.push({ label: 'Reorder Point', data: Array(labels.length).fill(min), borderColor: '#EF9F27', borderDash: [5,3], pointRadius: 0, tension: 0 });
+  stockChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets: ds },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, labels: { font: { size: 11 }, boxWidth: 12 } } },
+      scales: { x: { ticks: { font: { size: 10 }, maxRotation: 45, autoSkip: true } }, y: { beginAtZero: true, ticks: { font: { size: 11 } } } }
+    }
+  });
+}
+
+function renderPartsList() {
+  const c = document.getElementById('parts-list');
+  if (!parts.length) { c.innerHTML = '<div class="empty">ยังไม่มีวัตถุดิบ</div>'; return; }
+  let h = '<table><thead><tr><th>ชื่อ</th><th style="width:60px;">หน่วย</th><th style="width:80px;">Stock</th><th style="width:60px;">Min</th><th style="width:40px;"></th></tr></thead><tbody>';
+  parts.forEach(p => {
+    const s = getStock(p.id), min = parseFloat(p.min)||0;
+    let sc = 'var(--text)';
+    if (min > 0 && s <= 0) sc = 'var(--red)';
+    else if (min > 0 && s <= min) sc = 'var(--amber)';
+    h += `<tr><td><div style="font-weight:500;">${p.name}</div>${p.code?`<div style="font-size:11px;color:var(--text3);">${p.code}</div>`:''}</td><td>${p.unit}</td><td style="color:${sc};font-weight:600;">${s.toLocaleString()}</td><td>${min||'—'}</td><td><button class="btn btn-danger-outline" style="padding:4px 8px;font-size:12px;" onclick="deletePart('${p.id}')"><i class="ti ti-trash"></i></button></td></tr>`;
+  });
+  c.innerHTML = h + '</tbody></table>';
+}
+
+function addPart() {
+  const name = document.getElementById('p-name').value.trim();
+  const unit = document.getElementById('p-unit').value.trim();
+  const msg = document.getElementById('p-msg');
+  if (!name||!unit) { msg.className='msg err'; msg.textContent='กรุณากรอกชื่อและหน่วย'; return; }
+  parts.push({ id:'p_'+Date.now(), name, code: document.getElementById('p-code').value.trim(),
+    unit, initial: parseFloat(document.getElementById('p-initial').value)||0,
+    min: parseFloat(document.getElementById('p-min').value)||0,
+    target: parseFloat(document.getElementById('p-target').value)||0, createdAt: today() });
+  save();
+  msg.className='msg ok'; msg.textContent='เพิ่ม "'+name+'" สำเร็จ';
+  ['p-name','p-code','p-unit','p-initial','p-min','p-target'].forEach(id => document.getElementById(id).value='');
+  renderPartsList();
+  setTimeout(()=>msg.textContent='',3000);
+}
+
+function deletePart(id) {
+  if (!confirm('ลบวัตถุดิบนี้?')) return;
+  parts = parts.filter(p=>p.id!==id); save(); renderPartsList();
+}
+
+function fillSelects() {
+  ['out-part','in-part'].forEach(id => {
+    const s = document.getElementById(id), cur = s.value;
+    s.innerHTML = '<option value="">— เลือก —</option>';
+    parts.forEach(p => s.innerHTML += `<option value="${p.id}">${p.name} (${p.unit})</option>`);
+    if (cur) s.value = cur;
+  });
+}
+
+function previewOut() {
+  const pid = document.getElementById('out-part').value;
+  const qty = parseFloat(document.getElementById('out-qty').value)||0;
+  const el = document.getElementById('out-preview');
+  if (!pid) { el.textContent='—'; return; }
+  const p = parts.find(x=>x.id===pid), s = getStock(pid), res = Math.round((s-qty)*100)/100;
+  el.textContent = res.toLocaleString() + ' ' + (p?p.unit:'');
+  el.style.color = res < 0 ? 'var(--red)' : 'var(--text2)';
+}
+
+function previewIn() {
+  const pid = document.getElementById('in-part').value;
+  const qty = parseFloat(document.getElementById('in-qty').value)||0;
+  const el = document.getElementById('in-preview');
+  if (!pid) { el.textContent='—'; return; }
+  const p = parts.find(x=>x.id===pid), s = getStock(pid);
+  el.textContent = Math.round((s+qty)*100)/100 + ' ' + (p?p.unit:'');
+}
+
+function recordOut() {
+  const date=document.getElementById('out-date').value, partId=document.getElementById('out-part').value;
+  const to=document.getElementById('out-to').value.trim(), qty=parseFloat(document.getElementById('out-qty').value);
+  const note=document.getElementById('out-note').value.trim(), msg=document.getElementById('out-msg');
+  if (!date||!partId||!to||!qty||qty<=0) { msg.className='msg err'; msg.textContent='กรุณากรอกข้อมูลให้ครบ'; return; }
+  if (qty > getStock(partId)) { msg.className='msg err'; msg.textContent=`Stock ไม่พอ (มี ${getStock(partId)} หน่วย)`; return; }
+  transactions.push({ id:'tx_'+Date.now(), type:'out', date, partId, to, qty, note, ts:Date.now() }); save();
+  msg.className='msg ok'; msg.textContent='บันทึกการจ่ายสำเร็จ';
+  ['out-to','out-qty','out-note'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('out-preview').textContent='—';
+  renderRecentOut(); setTimeout(()=>msg.textContent='',3000);
+}
+
+function recordIn() {
+  const date=document.getElementById('in-date').value, partId=document.getElementById('in-part').value;
+  const from=document.getElementById('in-from').value.trim(), qty=parseFloat(document.getElementById('in-qty').value);
+  const po=document.getElementById('in-po').value.trim(), note=document.getElementById('in-note').value.trim(), msg=document.getElementById('in-msg');
+  if (!date||!partId||!from||!qty||qty<=0) { msg.className='msg err'; msg.textContent='กรุณากรอกข้อมูลให้ครบ'; return; }
+  transactions.push({ id:'tx_'+Date.now(), type:'in', date, partId, from, qty, po, note, ts:Date.now() }); save();
+  msg.className='msg ok'; msg.textContent='บันทึกการรับสำเร็จ';
+  ['in-from','in-qty','in-po','in-note'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('in-preview').textContent='—';
+  renderRecentIn(); setTimeout(()=>msg.textContent='',3000);
+}
+
+function renderRecentOut() {
+  const c=document.getElementById('out-recent');
+  const list=transactions.filter(t=>t.type==='out').sort((a,b)=>b.ts-a.ts).slice(0,6);
+  if (!list.length) { c.innerHTML='<div class="empty">ยังไม่มีรายการ</div>'; return; }
+  let h='';
+  list.forEach(t => {
+    const p=parts.find(x=>x.id===t.partId);
+    h+=`<div style="padding:8px 0;border-bottom:0.5px solid var(--border);font-size:13px;"><div style="display:flex;justify-content:space-between;"><span style="font-weight:500;">${p?p.name:'—'}</span><span style="color:var(--red);">-${parseFloat(t.qty).toLocaleString()} ${p?p.unit:''}</span></div><div style="color:var(--text3);font-size:11px;margin-top:2px;">${t.date} → ${t.to||'—'}</div></div>`;
+  });
+  c.innerHTML = h;
+}
+
+function renderRecentIn() {
+  const c=document.getElementById('in-recent');
+  const list=transactions.filter(t=>t.type==='in').sort((a,b)=>b.ts-a.ts).slice(0,6);
+  if (!list.length) { c.innerHTML='<div class="empty">ยังไม่มีรายการ</div>'; return; }
+  let h='';
+  list.forEach(t => {
+    const p=parts.find(x=>x.id===t.partId);
+    h+=`<div style="padding:8px 0;border-bottom:0.5px solid var(--border);font-size:13px;"><div style="display:flex;justify-content:space-between;"><span style="font-weight:500;">${p?p.name:'—'}</span><span style="color:var(--green);">+${parseFloat(t.qty).toLocaleString()} ${p?p.unit:''}</span></div><div style="color:var(--text3);font-size:11px;margin-top:2px;">${t.date} ← ${t.from||'—'}</div></div>`;
+  });
+  c.innerHTML = h;
+}
+
+function fillFilterSelects() {
+  const s=document.getElementById('f-part'), cur=s.value;
+  s.innerHTML='<option value="">ทั้งหมด</option>';
+  parts.forEach(p=>s.innerHTML+=`<option value="${p.id}">${p.name}</option>`);
+  if (cur) s.value=cur;
+}
+
+function renderHistory() {
+  const fp=document.getElementById('f-part').value, ft=document.getElementById('f-type').value;
+  const ff=document.getElementById('f-from').value, fto=document.getElementById('f-to').value;
+  let list=[...transactions];
+  if (fp) list=list.filter(t=>t.partId===fp);
+  if (ft) list=list.filter(t=>t.type===ft);
+  if (ff) list=list.filter(t=>t.date>=ff);
+  if (fto) list=list.filter(t=>t.date<=fto);
+  list.sort((a,b)=>b.date.localeCompare(a.date)||b.ts-a.ts);
+  const c=document.getElementById('history-table');
+  if (!list.length) { c.innerHTML='<div class="empty">ไม่พบรายการ</div>'; return; }
+  let h='<table style="table-layout:fixed;"><thead><tr><th style="width:90px;">วันที่</th><th style="width:75px;">ประเภท</th><th>วัตถุดิบ</th><th style="width:100px;">จำนวน</th><th>คู่ค้า</th><th>หมายเหตุ</th></tr></thead><tbody>';
+  list.forEach(t => {
+    const p=parts.find(x=>x.id===t.partId);
+    const col=t.type==='in'?'var(--green)':'var(--red)';
+    const sign=t.type==='in'?'+':'-';
+    h+=`<tr><td>${t.date}</td><td>${t.type==='in'?'<span class="badge badge-green">รับเข้า</span>':'<span class="badge badge-red">จ่ายออก</span>'}</td><td>${p?p.name:'—'}</td><td style="color:${col};font-weight:500;">${sign}${parseFloat(t.qty).toLocaleString()} ${p?p.unit:''}</td><td>${t.type==='in'?(t.from||'—'):(t.to||'—')}</td><td style="color:var(--text3);">${t.note||t.po||'—'}</td></tr>`;
+  });
+  c.innerHTML=h+'</tbody></table>';
+}
+
+function exportExcel() {
+  const fp=document.getElementById('f-part').value, ft=document.getElementById('f-type').value;
+  const ff=document.getElementById('f-from').value, fto=document.getElementById('f-to').value;
+  let list=[...transactions];
+  if (fp) list=list.filter(t=>t.partId===fp);
+  if (ft) list=list.filter(t=>t.type===ft);
+  if (ff) list=list.filter(t=>t.date>=ff);
+  if (fto) list=list.filter(t=>t.date<=fto);
+  list.sort((a,b)=>a.date.localeCompare(b.date));
+  const rows=list.map(t=>{
+    const p=parts.find(x=>x.id===t.partId);
+    return { 'วันที่':t.date,'ประเภท':t.type==='in'?'รับเข้า':'จ่ายออก','วัตถุดิบ':p?p.name:'—','รหัส':p?p.code:'—','จำนวน':parseFloat(t.qty),'หน่วย':p?p.unit:'—','คู่ค้า':t.type==='in'?(t.from||'—'):(t.to||'—'),'PO No.':t.po||'—','หมายเหตุ':t.note||'—' };
+  });
+  const snap=parts.map(p=>({ 'ชื่อ':p.name,'รหัส':p.code,'หน่วย':p.unit,'Stock ปัจจุบัน':getStock(p.id),'Reorder Point':p.min||0,'เป้าหมาย':p.target||0 }));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Stock Movement');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(snap), 'Stock Snapshot');
+  XLSX.writeFile(wb, 'StockReport_' + today() + '.xlsx');
+}
+
+load();
+renderDashboard();
+</script>
+</body>
+</html>
